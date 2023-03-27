@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -28,17 +27,11 @@ const (
 )
 
 type SlimAuthClient struct {
-	// 这几个值都是单向绑定，直接用 string 即可。
-	key   string
-	sec   string
-	uri   string
-	param string
-
-	// 用于更新 res 。
-	mu sync.Mutex
-
-	// 直接用 string 控件不能实现双向绑定。
-	res binding.String
+	key    binding.String
+	sec    binding.String
+	uri    binding.String
+	param  binding.String
+	result binding.String
 }
 
 var _ client.Client = (*SlimAuthClient)(nil)
@@ -46,7 +39,11 @@ var _ client.Client = (*SlimAuthClient)(nil)
 // 创建一个 [*SlimAuthClient] 。
 func NewClient() *SlimAuthClient {
 	return &SlimAuthClient{
-		res: binding.NewString(),
+		key:    binding.NewString(),
+		sec:    binding.NewString(),
+		uri:    binding.NewString(),
+		param:  binding.NewString(),
+		result: binding.NewString(),
 	}
 }
 
@@ -68,28 +65,44 @@ func (x *SlimAuthClient) GetConfig() map[string]any {
 }
 
 func (x *SlimAuthClient) SetConfig(config map[string]any) {
-	x.key = config[_KEY].(string)
-	x.sec = config[_SECRET].(string)
-	x.uri = config[_URI].(string)
-	x.param = config[_PARAM].(string)
+	read := func(name string) string {
+		v, ok := config[name]
+		if !ok {
+			x.result.Set("missing config key: " + name)
+			return ""
+		}
+
+		s, ok := v.(string)
+		if !ok {
+			x.result.Set("config value error, key: " + name)
+			return ""
+		}
+
+		return s
+	}
+
+	x.key.Set(read(_KEY))
+	x.sec.Set(read(_SECRET))
+	x.uri.Set(read(_URI))
+	x.param.Set(read(_PARAM))
 }
 
 func (x *SlimAuthClient) Box() fyne.CanvasObject {
 	paramInput := widget.NewMultiLineEntry()
-	paramInput.Bind(binding.BindString(&x.param))
+	paramInput.Bind(x.param)
 
 	requestForm := &widget.Form{
 		Items: []*widget.FormItem{
-			{Text: "Key", Widget: widget.NewEntryWithData(binding.BindString(&x.key))},
-			{Text: "Secret", Widget: widget.NewEntryWithData(binding.BindString(&x.sec))},
-			{Text: "URL", Widget: widget.NewEntryWithData(binding.BindString(&x.uri))},
+			{Text: "Key", Widget: widget.NewEntryWithData(x.key)},
+			{Text: "Secret", Widget: widget.NewEntryWithData(x.sec)},
+			{Text: "URL", Widget: widget.NewEntryWithData(x.uri)},
 			{Text: "Param", Widget: paramInput},
 		},
 		OnSubmit: x.onSubmit,
 	}
 
 	responseBox := widget.NewMultiLineEntry()
-	responseBox.Bind(x.res)
+	responseBox.Bind(x.result)
 
 	container := container.NewHSplit(
 		container.NewVScroll(requestForm),
@@ -101,7 +114,7 @@ func (x *SlimAuthClient) Box() fyne.CanvasObject {
 
 func (x *SlimAuthClient) onSubmit() {
 	// 采用异步请求。
-	x.res.Set("requesting ...")
+	x.result.Set("requesting ...")
 
 	go func() {
 		// 发现更新 binding.String 速度太快会来不及反馈到界面上。等一下下。
@@ -109,13 +122,11 @@ func (x *SlimAuthClient) onSubmit() {
 
 		responseText, err := x.performRequest()
 
-		x.mu.Lock()
 		if err != nil {
-			x.res.Set(err.Error())
+			x.result.Set(err.Error())
 		} else {
-			x.res.Set(responseText)
+			x.result.Set(responseText)
 		}
-		x.mu.Unlock()
 	}()
 }
 
@@ -126,19 +137,24 @@ func (x *SlimAuthClient) performRequest() (responseText string, err error) {
 		}
 	}()
 
+	key, _ := x.key.Get()
+	sec, _ := x.sec.Get()
+	uri, _ := x.uri.Get()
+	param, _ := x.param.Get()
+
 	// Body must be a JSON.
-	if !json.Valid([]byte(x.param)) {
+	if !json.Valid([]byte(param)) {
 		return "", fmt.Errorf("the request message is not a valid JSON")
 	}
 
-	requestBody := strings.NewReader(x.param)
-	request, err := http.NewRequest(http.MethodPost, x.uri, requestBody)
+	requestBody := strings.NewReader(param)
+	request, err := http.NewRequest(http.MethodPost, uri, requestBody)
 	if err != nil {
 		return "", err
 	}
 
 	request.Header.Set(headers.ContentType, "application/json")
-	signResult := slimauth.AppendSign(request, x.key, x.sec, "", time.Now().Unix())
+	signResult := slimauth.AppendSign(request, key, sec, "", time.Now().Unix())
 	if signResult.Type != slimauth.SignResultType_OK {
 		return "", signResult.Cause
 	}
