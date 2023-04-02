@@ -3,6 +3,7 @@
 package client
 
 import (
+	"flag"
 	"os"
 	"path"
 
@@ -44,4 +45,20 @@ func GetDefaultConfigDir() string {
 
 	dir = path.Join(dir, ".go-webapi-client")
 	return dir
+}
+
+// 运行并展示主窗体，在窗体中展示给定的 [Client] 。
+//
+// 会从程序的启动参数中读取下列参数，其余参数均使用默认值：
+//   - -c 指定配置文件的存储目录。
+func RunClients(clients []Client) {
+	configPath := flag.String("c", "", "specify the directory of config files")
+	flag.Parse()
+
+	op := &MainWindowOption{
+		ConfigPath: *configPath,
+		Clients:    clients,
+	}
+	win := NewMainWindow(op)
+	win.ShowAndRun()
 }
