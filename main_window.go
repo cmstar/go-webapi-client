@@ -1,10 +1,13 @@
 package client
 
 import (
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -200,10 +203,18 @@ func (x *MainWindow) makeConfigOperation() fyne.CanvasObject {
 			return
 		}
 
-		c := x.clientBoxData.client
-		x.configManager.Remove(c.Name(), key)
+		callback := func(ok bool) {
+			if !ok {
+				return
+			}
 
-		x.reloadConfig(c.Name())
+			c := x.clientBoxData.client
+			x.configManager.Remove(c.Name(), key)
+
+			x.reloadConfig(c.Name())
+		}
+		msg := fmt.Sprintf("Delete config >> %s <<?", key)
+		dialog.ShowConfirm("Confirm deletion", msg, callback, x.win)
 	})
 
 	return container.NewVBox(
