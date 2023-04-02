@@ -56,11 +56,16 @@ func (x *SlimAuthClient) Title() string {
 }
 
 func (x *SlimAuthClient) GetConfig() map[string]any {
+	key, _ := x.key.Get()
+	sec, _ := x.sec.Get()
+	uri, _ := x.uri.Get()
+	param, _ := x.param.Get()
+
 	return map[string]any{
-		_KEY:    x.key,
-		_SECRET: x.sec,
-		_URI:    x.uri,
-		_PARAM:  x.param,
+		_KEY:    key,
+		_SECRET: sec,
+		_URI:    uri,
+		_PARAM:  param,
 	}
 }
 
