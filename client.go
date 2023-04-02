@@ -3,13 +3,21 @@
 package client
 
 import (
+	"os"
+	"path"
+
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
+)
+
+const (
+	DefaultWindowWidth  = 1440 // 默认的窗口宽度。
+	DefaultWindowHeight = 800  // 默认的窗口高度。
 )
 
 // 描述一个 Web API 客户端的界面。
 type Client interface {
 	// 唯一的标识一个 [Client] ，配置的保存和读取需要用到此值。
+	// 应符合 Go 变量命名规则。
 	Name() string
 
 	// 界面展示的标题。
@@ -25,34 +33,15 @@ type Client interface {
 	SetConfig(config map[string]any)
 }
 
-type RunOption struct {
-	Width   float32  // 窗口的宽度。若为0，套用默认值。
-	Height  float32  // 窗口的高度。若为0，套用默认值。
-	Clients []Client // 要展示的 [Client] 。
-}
-
-// 运行程序。
-func Run(op *RunOption) {
-	if len(op.Clients) == 0 {
-		panic("there must be at least one Client")
+// 返回默认的配置存储目录。默认存储在用户的 home 目录的 .go-webapi-client 子目录。
+//   - 在 *nix 是 ~/.go-webapi-client
+//   - 在 Windows 是 %UserProfile%\.go-webapi-client
+func GetDefaultConfigDir() string {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
 	}
 
-	a := app.New()
-	w := a.NewWindow("Test client for go-webapi")
-
-	w.Resize(fyne.NewSize(
-		determineSize(op.Width, 880),
-		determineSize(op.Height, 550),
-	))
-
-	client := op.Clients[0]
-	w.SetContent(client.Box())
-	w.ShowAndRun()
-}
-
-func determineSize(v, dft float32) float32 {
-	if v > 0 {
-		return v
-	}
-	return dft
+	dir = path.Join(dir, ".go-webapi-client")
+	return dir
 }

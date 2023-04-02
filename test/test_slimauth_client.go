@@ -54,8 +54,10 @@ func runClient(uri string) {
 		"Param":  `{"S1": 123, "S2": "line1\nline2"}`,
 	})
 
-	op := &client.RunOption{
-		Clients: []client.Client{c},
+	op := &client.MainWindowOption{
+		ConfigPath: "./.config_test",
+		Clients:    []client.Client{c},
 	}
-	client.Run(op)
+	win := client.NewMainWindow(op)
+	win.ShowAndRun()
 }
